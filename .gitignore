@@ -6,4 +6,4 @@ output.txt
 input.wav
 output.wav
 node_modules/
-model.pt
+*.pt

@@ -2,13 +2,13 @@ import os
 import torch
 import requests
 import urllib.parse
-from utils.katakana import *
+#from utils.katakana import *
 
 # https://github.com/snakers4/silero-models#text-to-speech
 def silero_tts(tts, language, model, speaker):
     device = torch.device('cpu')
     torch.set_num_threads(4)
-    local_file = 'model.pt'
+    local_file = f'{language}_{model}.pt'
 
     if not os.path.isfile(local_file):
         torch.hub.download_url_to_file(f'https://models.silero.ai/models/tts/{language}/{model}.pt',

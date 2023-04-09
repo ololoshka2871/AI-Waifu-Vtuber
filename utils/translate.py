@@ -48,11 +48,12 @@ def detect_google(text):
         translator = googletrans.Translator()
         result = translator.detect(text)
         return result.lang.upper()
-    except:
-        print("Error detect")
+    except Exception as e:
+        print(f"Error detect: {e}")
         return
 
 if __name__ == "__main__":
-    text = "aku tidak menyukaimu"
-    source = translate_deeplx(text, "ID", "JA")
+    text = "Привет!"
+    #source = translate_deeplx(text, "RU", "JA")
+    tts = translate_google(text, f"RU", "JA")
     print(source)

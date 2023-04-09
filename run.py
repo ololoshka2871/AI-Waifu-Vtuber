@@ -1,5 +1,6 @@
 import openai
-import winsound
+import sounddevice as sd
+import soundfile as sf
 import sys
 import pytchat
 import time
@@ -10,8 +11,10 @@ import wave
 import threading
 import json
 import socket
+import time
+
 from emoji import demojize
-from config import *
+import config
 from utils.translate import *
 from utils.TTS import *
 from utils.subtitle import *
@@ -22,7 +25,7 @@ from utils.twitch_config import *
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
 
 # use your own API Key, you can get it from https://openai.com/. I place my API Key in a separate file called config.py
-openai.api_key = api_key
+openai.api_key = config.api_key
 
 conversation = []
 # Create a dictionary to hold the message data
@@ -34,8 +37,40 @@ chat = ""
 chat_now = ""
 chat_prev = ""
 is_Speaking = False
-owner_name = "Ardha"
+owner_name = config.owner_name
 blacklist = ["Nightbot", "streamelements"]
+
+sd.default.device = config.sound_device if hasattr(config, 'sound_device') else 0  # python -m sounddevice -> list devices
+
+current_sound_frame = 0
+
+def play_wav(wav_file):
+    global current_sound_frame
+    event = threading.Event()
+
+    try:
+        data, fs = sf.read(wav_file, always_2d=True)
+
+        current_sound_frame = 0
+
+        def callback(outdata, frames, time, status):
+            global current_sound_frame
+            if status:
+                print(status)
+            chunksize = min(len(data) - current_sound_frame, frames)
+            outdata[:chunksize] = data[current_sound_frame:current_sound_frame + chunksize]
+            if chunksize < frames:
+                outdata[chunksize:] = 0
+                raise sd.CallbackStop()
+            current_sound_frame += chunksize
+
+        stream = sd.OutputStream(
+            samplerate=fs, channels=data.shape[1],
+            callback=callback, finished_callback=event.set)
+        with stream:
+            event.wait()  # Wait until playback is finished
+    except KeyboardInterrupt:
+        exit('\nInterrupted by user')
 
 # function to get the user's input audio
 def record_audio():
@@ -187,13 +222,13 @@ def translate_text(text):
 
     # tts will be the string to be converted to audio
     detect = detect_google(text)
-    tts = translate_google(text, f"{detect}", "JA")
+    # tts = translate_google(text, f"{detect}", "JA")
     # tts = translate_deeplx(text, f"{detect}", "JA")
-    tts_en = translate_google(text, f"{detect}", "EN")
+    tts_en = translate_google(text, f"{detect}", "RU")
     try:
         # print("ID Answer: " + subtitle)
-        print("JP Answer: " + tts)
-        print("EN Answer: " + tts_en)
+        print("Orig answer: " + text)
+        print("RU Answer: " + tts_en)
     except:
         print("Error translating text")
         return
@@ -203,16 +238,18 @@ def translate_text(text):
     # voicevox_tts(tts)
 
     # Silero TTS, Silero TTS can generate English, Russian, French, Hindi, Spanish, German, etc. Uncomment the line below. Make sure the input is in that language
-    silero_tts(tts_en, "en", "v3_en", "en_21")
+    #silero_tts(tts_en, "en", "v3_en", "en_21")
+    silero_tts(tts_en, "ru", "ru_v3", "kseniya")
 
     # Generate Subtitle
     generate_subtitle(chat_now, text)
 
-    time.sleep(1)
+    time.sleep(0.3)
 
     # is_Speaking is used to prevent the assistant speaking more than one audio at a time
     is_Speaking = True
-    winsound.PlaySound("test.wav", winsound.SND_FILENAME)
+    play_wav("test.wav")
+    #winsound.PlaySound("test.wav", winsound.SND_FILENAME)
     is_Speaking = False
 
     # Clear the text files after the assistant has finished speaking
@@ -246,6 +283,7 @@ if __name__ == "__main__":
             while True:
                 if keyboard.is_pressed('RIGHT_SHIFT'):
                     record_audio()
+                time.sleep(0.05)
             
         elif mode == "2":
             live_id = input("Livestream ID: ")
